@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Server設定JSON変換ツール (JS版)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Hide elements by default */
+        .hidden-view {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900">
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-lg bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 transition-all">
+            <div class="text-center">
+                <h1 class="text-2xl font-bold text-gray-800 dark:text-white">MCP設定変換ツール</h1>
+                <p class="text-gray-500 dark:text-gray-400 mt-2">JSONファイルをアップロードして変換します</p>
+            </div>
+
+            <div class="mt-8">
+                <!-- Hidden file input -->
+                <input type="file" accept=".json" id="file-input" class="hidden" />
+
+                <!-- Main content area -->
+                <div id="drop-zone" class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 flex flex-col items-center justify-center text-center">
+                    
+                    <!-- Idle View -->
+                    <div id="idle-view">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        <button id="select-file-button" class="mt-4 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-transform transform hover:scale-105">
+                            ファイルを選択
+                        </button>
+                    </div>
+
+                    <!-- Processing View -->
+                    <div id="processing-view" class="hidden-view">
+                        <svg class="animate-spin h-5 w-5 text-gray-600 dark:text-gray-300 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="mt-2 font-medium text-gray-600 dark:text-gray-300">処理中...</p>
+                        <p id="processing-filename" class="text-sm text-gray-500 dark:text-gray-400"></p>
+                    </div>
+
+                    <!-- Ready View -->
+                    <div id="ready-view" class="hidden-view">
+                        <h3 class="font-semibold text-lg text-green-600 dark:text-green-400">変換が完了しました！</h3>
+                        <p id="ready-filename" class="text-gray-600 dark:text-gray-300 my-2"></p>
+                        <button id="download-button" class="mt-4 px-6 py-3 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition-transform transform hover:scale-105 flex items-center mx-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            変換ファイルをダウンロード
+                        </button>
+                        <button id="convert-another-button" class="mt-4 text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                            別のファイルを変換
+                        </button>
+                    </div>
+                    
+                    <!-- Error View -->
+                    <div id="error-view" class="hidden-view">
+                         <p id="error-message" class="mt-4 text-sm text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-900/20 p-3 rounded-md"></p>
+                         <button id="try-again-button" class="mt-4 text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                            もう一度試す
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+            <div class="text-center mt-6">
+                <p class="text-xs text-gray-400 dark:text-gray-500">© 2025 超軽量版ツール. 依存関係ゼロで動作します。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const fileInput = document.getElementById('file-input');
+            const selectFileButton = document.getElementById('select-file-button');
+            const downloadButton = document.getElementById('download-button');
+            const convertAnotherButton = document.getElementById('convert-another-button');
+            const tryAgainButton = document.getElementById('try-again-button');
+
+            const idleView = document.getElementById('idle-view');
+            const processingView = document.getElementById('processing-view');
+            const readyView = document.getElementById('ready-view');
+            const errorView = document.getElementById('error-view');
+
+            const processingFilename = document.getElementById('processing-filename');
+            const readyFilename = document.getElementById('ready-filename');
+            const errorMessage = document.getElementById('error-message');
+
+            // --- State Variables ---
+            let convertedData = null;
+            let originalFileName = null;
+
+            // --- CORE TRANSFORMATION LOGIC ---
+            const transformJson = (data) => {
+                if (Array.isArray(data)) {
+                    return data.map(item => transformJson(item));
+                }
+                if (typeof data === 'object' && data !== null) {
+                    const newObj = {};
+                    for (const key in data) {
+                        if (Object.prototype.hasOwnProperty.call(data, key)) {
+                            const value = data[key];
+                            if (key === 'url') {
+                                newObj['httpUrl'] = transformJson(value);
+                            } else if (key !== 'type' && key !== 'description') {
+                                newObj[key] = transformJson(value);
+                            }
+                        }
+                    }
+                    return newObj;
+                }
+                return data;
+            };
+
+            // --- UI Update Logic ---
+            const updateView = (status) => {
+                // Hide all views first
+                idleView.style.display = 'none';
+                processingView.style.display = 'none';
+                readyView.style.display = 'none';
+                errorView.style.display = 'none';
+                
+                // Show the correct view based on status
+                switch (status) {
+                    case 'processing':
+                        processingView.style.display = 'block';
+                        break;
+                    case 'ready':
+                        readyView.style.display = 'block';
+                        break;
+                    case 'error':
+                        errorView.style.display = 'block';
+                        break;
+                    case 'idle':
+                    default:
+                        idleView.style.display = 'block';
+                        break;
+                }
+            };
+            
+            // --- Event Handlers ---
+            const handleFileSelect = () => {
+                fileInput.click();
+            };
+
+            const handleFileChange = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                originalFileName = file.name;
+                processingFilename.textContent = originalFileName;
+                updateView('processing');
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const text = e.target.result;
+                        const jsonData = JSON.parse(text);
+                        convertedData = transformJson(jsonData);
+                        readyFilename.textContent = originalFileName;
+                        updateView('ready');
+                    } catch (err) {
+                        console.error("JSON Parse Error:", err);
+                        errorMessage.textContent = '無効なJSONファイルです。ファイル形式を確認してください。';
+                        updateView('error');
+                    }
+                };
+                reader.onerror = () => {
+                    errorMessage.textContent = 'ファイルの読み込み中にエラーが発生しました。';
+                    updateView('error');
+                };
+                reader.readAsText(file);
+            };
+
+            const handleDownload = () => {
+                if (!convertedData || !originalFileName) return;
+
+                const jsonString = JSON.stringify(convertedData, null, 2);
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const newFileName = originalFileName.replace(/(\.json)?$/, '_converted.json');
+                a.download = newFileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+            
+            const resetState = () => {
+                convertedData = null;
+                originalFileName = null;
+                fileInput.value = ''; // Allow re-selecting the same file
+                updateView('idle');
+            };
+
+            // --- Event Listeners ---
+            selectFileButton.addEventListener('click', handleFileSelect);
+            fileInput.addEventListener('change', handleFileChange);
+            downloadButton.addEventListener('click', handleDownload);
+            convertAnotherButton.addEventListener('click', resetState);
+            tryAgainButton.addEventListener('click', resetState);
+
+            // Initial state
+            resetState();
+        });
+    </script>
+</body>
+</html>
